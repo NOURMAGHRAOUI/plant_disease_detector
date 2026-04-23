@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🌿 Plant Disease Detector</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface2: #1c2330;
+    --border: #2a3441;
+    --green: #3fb950;
+    --green-dim: #1a3d25;
+    --orange: #f97316;
+    --red: #ef4444;
+    --purple: #a78bfa;
+    --text: #e6edf3;
+    --muted: #7d8590;
+    --accent: #58a6ff;
+  }
+
+  * { margin:0; padding:0; box-sizing:border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Outfit', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* ── Background grid */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image:
+      linear-gradient(rgba(63,185,80,.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(63,185,80,.04) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+
+  /* ── Header */
+  header {
+    padding: 40px 0 32px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 20px;
+  }
+
+  .logo {
+    width: 52px; height: 52px;
+    background: linear-gradient(135deg, #22c55e, #16a34a);
+    border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px; flex-shrink: 0;
+    box-shadow: 0 0 30px rgba(34,197,94,.25);
+  }
+
+  .header-text h1 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 28px;
+    letter-spacing: -.5px;
+  }
+  .header-text p { color: var(--muted); font-size: 14px; margin-top: 2px; }
+
+  .badge {
+    margin-left: auto;
+    background: var(--green-dim);
+    border: 1px solid var(--green);
+    color: var(--green);
+    font-size: 12px; font-weight: 500;
+    padding: 4px 12px; border-radius: 100px;
+    font-family: 'DM Mono', monospace;
+  }
+
+  /* ── Main layout */
+  .main { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; padding: 32px 0; }
+
+  @media (max-width: 768px) { .main { grid-template-columns: 1fr; } }
+
+  /* ── Cards */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+  }
+
+  .card-title {
+    font-size: 13px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 1px; color: var(--muted); margin-bottom: 20px;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .card-title .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--green);
+  }
+
+  /* ── Upload zone */
+  .upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    padding: 32px;
+    text-align: center;
+    cursor: pointer;
+    transition: all .2s;
+    position: relative;
+  }
+  .upload-zone:hover, .upload-zone.dragover {
+    border-color: var(--green);
+    background: rgba(63,185,80,.04);
+  }
+  .upload-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+  .upload-icon { font-size: 36px; margin-bottom: 8px; }
+  .upload-zone p { color: var(--muted); font-size: 14px; }
+  .upload-zone strong { color: var(--text); }
+
+  #preview-img {
+    width: 100%; max-height: 200px; object-fit: cover;
+    border-radius: 10px; margin-top: 12px; display: none;
+  }
+
+  /* ── Form fields */
+  .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+  .field label {
+    display: block; font-size: 12px; color: var(--muted);
+    margin-bottom: 4px; font-family: 'DM Mono', monospace;
+  }
+  .field input {
+    width: 100%; background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text); font-family: 'DM Mono', monospace;
+    font-size: 14px; padding: 8px 12px; border-radius: 8px;
+    outline: none; transition: border-color .2s;
+  }
+  .field input:focus { border-color: var(--green); }
+
+  /* ── Button */
+  .btn-predict {
+    width: 100%; margin-top: 20px;
+    background: linear-gradient(135deg, #22c55e, #16a34a);
+    color: white; border: none; border-radius: 12px;
+    padding: 14px; font-size: 15px; font-weight: 600;
+    cursor: pointer; letter-spacing: .3px;
+    transition: all .2s; display: flex; align-items: center;
+    justify-content: center; gap: 8px;
+  }
+  .btn-predict:hover { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(34,197,94,.3); }
+  .btn-predict:active { transform: translateY(0); }
+  .btn-predict:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+  /* ── Result panel */
+  #result-panel { display: none; }
+
+  .result-header {
+    display: flex; align-items: center; gap: 16px;
+    background: var(--surface2);
+    border-radius: 12px; padding: 20px;
+    border-left: 4px solid var(--green);
+    margin-bottom: 20px;
+  }
+  .result-emoji { font-size: 40px; }
+  .result-class { font-family: 'DM Serif Display', serif; font-size: 22px; }
+  .result-confidence { color: var(--muted); font-size: 13px; font-family: 'DM Mono', monospace; }
+
+  /* Probability bars */
+  .prob-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+  .prob-row { display: flex; align-items: center; gap: 10px; }
+  .prob-label { width: 130px; font-size: 12px; color: var(--muted); font-family: 'DM Mono', monospace; flex-shrink: 0; }
+  .prob-bar-bg {
+    flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden;
+  }
+  .prob-bar-fill { height: 100%; border-radius: 3px; transition: width .6s ease; }
+  .prob-value { width: 40px; text-align: right; font-size: 12px; color: var(--muted); font-family: 'DM Mono', monospace; }
+
+  /* Treatment */
+  .treatment-box {
+    background: var(--surface2); border-radius: 10px; padding: 16px;
+    border: 1px solid var(--border);
+  }
+  .treatment-title { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 8px; }
+  .treatment-text { font-size: 14px; line-height: 1.6; }
+  .severity-badge {
+    display: inline-block; padding: 2px 10px;
+    border-radius: 100px; font-size: 12px; font-weight: 500;
+    margin-bottom: 8px;
+  }
+
+  /* Detail comparison */
+  .model-comparison {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 12px;
+  }
+  .model-box {
+    background: var(--surface2); border-radius: 10px; padding: 12px;
+    border: 1px solid var(--border); text-align: center;
+  }
+  .model-box .model-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+  .model-box .model-pred { font-family: 'DM Serif Display', serif; font-size: 16px; margin: 4px 0; }
+  .model-box .model-conf { font-family: 'DM Mono', monospace; font-size: 12px; color: var(--accent); }
+
+  /* Spinner */
+  .spinner {
+    width: 18px; height: 18px; border: 2px solid rgba(255,255,255,.3);
+    border-top-color: white; border-radius: 50%;
+    animation: spin .7s linear infinite; display: none;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <div class="logo">🌿</div>
+    <div class="header-text">
+      <h1>Plant Disease Detector</h1>
+      <p>Diagnostic hybride CNN + Random Forest / XGBoost</p>
+    </div>
+    <span class="badge">ML + DL</span>
+  </header>
+
+  <div class="main">
+
+    <!-- ── LEFT PANEL : Inputs -->
+    <div>
+      <!-- Image upload -->
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-title"><span class="dot"></span>Image de la feuille</div>
+        <div class="upload-zone" id="drop-zone">
+          <input type="file" id="image-input" accept="image/*">
+          <div class="upload-icon">📷</div>
+          <p><strong>Glisser-déposer</strong> ou cliquer pour sélectionner</p>
+          <p style="margin-top:4px">JPG, PNG — max 16 MB</p>
+          <img id="preview-img" alt="Aperçu">
+        </div>
+      </div>
+
+      <!-- Agronomic data -->
+      <div class="card">
+        <div class="card-title"><span class="dot"></span>Données agronomiques</div>
+        <div class="form-grid">
+          <div class="field"><label>Température (°C)</label><input type="number" id="temperature" value="22" step="0.1"></div>
+          <div class="field"><label>Humidité (%)</label><input type="number" id="humidity" value="60" min="0" max="100"></div>
+          <div class="field"><label>Précipitations (mm)</label><input type="number" id="rainfall" value="50" min="0"></div>
+          <div class="field"><label>pH du sol</label><input type="number" id="soil_ph" value="6.5" step="0.1" min="4" max="9"></div>
+          <div class="field"><label>Azote (mg/kg)</label><input type="number" id="nitrogen" value="35" min="0"></div>
+          <div class="field"><label>Phosphore (mg/kg)</label><input type="number" id="phosphorus" value="18" min="0"></div>
+          <div class="field"><label>Potassium (mg/kg)</label><input type="number" id="potassium" value="25" min="0"></div>
+          <div class="field"><label>Indice foliaire</label><input type="number" id="leaf_area_index" value="2.5" step="0.1" min="0"></div>
+          <div class="field"><label>Âge plante (jours)</label><input type="number" id="plant_age_days" value="60" min="1"></div>
+          <div class="field"><label>Infection préc. (0/1)</label><input type="number" id="previous_infection" value="0" min="0" max="1"></div>
+        </div>
+
+        <button class="btn-predict" id="btn-predict" onclick="runPrediction()">
+          <span class="spinner" id="spinner"></span>
+          <span id="btn-text">🔍 Analyser la plante</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ── RIGHT PANEL : Results -->
+    <div>
+      <!-- Placeholder -->
+      <div class="card" id="placeholder-panel">
+        <div style="text-align:center; padding: 60px 20px;">
+          <div style="font-size:64px;margin-bottom:16px">🌱</div>
+          <p style="color:var(--muted);font-size:15px">Le diagnostic apparaîtra ici<br>après l'analyse</p>
+        </div>
+      </div>
+
+      <!-- Result -->
+      <div class="card" id="result-panel">
+        <div class="card-title"><span class="dot"></span>Diagnostic</div>
+
+        <div class="result-header" id="result-header">
+          <div class="result-emoji" id="result-emoji">✅</div>
+          <div>
+            <div class="result-class" id="result-class">—</div>
+            <div class="result-confidence" id="result-confidence">—</div>
+          </div>
+        </div>
+
+        <div class="prob-list" id="prob-list"></div>
+
+        <div class="treatment-box">
+          <div class="treatment-title">Recommandation</div>
+          <div class="severity-badge" id="severity-badge">—</div>
+          <div class="treatment-text" id="treatment-text">—</div>
+        </div>
+
+        <div style="margin-top:16px">
+          <div class="card-title" style="margin-bottom:12px"><span class="dot" style="background:var(--accent)"></span>Détail des modèles</div>
+          <div class="model-comparison">
+            <div class="model-box">
+              <div class="model-label">🧠 CNN (DL)</div>
+              <div class="model-pred" id="dl-class">—</div>
+              <div class="model-conf" id="dl-conf">—</div>
+            </div>
+            <div class="model-box">
+              <div class="model-label">🌲 RF+XGB (ML)</div>
+              <div class="model-pred" id="ml-class">—</div>
+              <div class="model-conf" id="ml-conf">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const COLOR_MAP = {
+  "Healthy":           "#22c55e",
+  "Rust":              "#f97316",
+  "Black_Spot":        "#9ca3af",
+  "Powdery_Mildew":    "#a78bfa",
+  "Bacterial_Blight":  "#ef4444",
+};
+
+// Image preview
+const imageInput = document.getElementById('image-input');
+const previewImg = document.getElementById('preview-img');
+const dropZone   = document.getElementById('drop-zone');
+
+imageInput.addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (file) showPreview(file);
+});
+
+['dragover','dragleave','drop'].forEach(evt => {
+  dropZone.addEventListener(evt, e => {
+    e.preventDefault();
+    dropZone.classList.toggle('dragover', evt === 'dragover');
+    if (evt === 'drop' && e.dataTransfer.files[0]) {
+      showPreview(e.dataTransfer.files[0]);
+      imageInput.files = e.dataTransfer.files;
+    }
+  });
+});
+
+function showPreview(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    previewImg.src = e.target.result;
+    previewImg.style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+}
+
+// Prediction
+async function runPrediction() {
+  const btn     = document.getElementById('btn-predict');
+  const spinner = document.getElementById('spinner');
+  const btnText = document.getElementById('btn-text');
+
+  btn.disabled = true;
+  spinner.style.display = 'block';
+  btnText.textContent = 'Analyse en cours…';
+
+  const formData = new FormData();
+  const fields = ['temperature','humidity','rainfall','soil_ph','nitrogen',
+                  'phosphorus','potassium','leaf_area_index','plant_age_days','previous_infection'];
+  fields.forEach(f => formData.append(f, document.getElementById(f).value));
+
+  if (imageInput.files[0]) formData.append('image', imageInput.files[0]);
+
+  try {
+    const res = await fetch('/predict', { method: 'POST', body: formData });
+    const data = await res.json();
+
+    if (data.success) {
+      renderResult(data.result);
+    } else {
+      alert('Erreur : ' + data.error);
+    }
+  } catch(err) {
+    alert('Erreur réseau : ' + err.message);
+  }
+
+  btn.disabled = false;
+  spinner.style.display = 'none';
+  btnText.textContent = '🔍 Analyser la plante';
+}
+
+function renderResult(r) {
+  document.getElementById('placeholder-panel').style.display = 'none';
+  const panel = document.getElementById('result-panel');
+  panel.style.display = 'block';
+
+  const color = COLOR_MAP[r.final_class] || '#7d8590';
+
+  // Header
+  document.getElementById('result-header').style.borderLeftColor = color;
+  document.getElementById('result-emoji').textContent  = r.emoji;
+  document.getElementById('result-class').textContent  = r.final_class.replace('_', ' ');
+  document.getElementById('result-confidence').textContent = `Confiance : ${(r.confidence*100).toFixed(1)}%`;
+
+  // Probability bars
+  const list = document.getElementById('prob-list');
+  list.innerHTML = '';
+  const probs = r.probabilities;
+  Object.entries(probs).sort((a,b) => b[1]-a[1]).forEach(([cls, p]) => {
+    const c = COLOR_MAP[cls] || '#7d8590';
+    list.innerHTML += `
+      <div class="prob-row">
+        <span class="prob-label">${cls.replace('_',' ')}</span>
+        <div class="prob-bar-bg">
+          <div class="prob-bar-fill" style="width:${(p*100).toFixed(1)}%;background:${c}"></div>
+        </div>
+        <span class="prob-value">${(p*100).toFixed(0)}%</span>
+      </div>`;
+  });
+
+  // Treatment
+  const badge = document.getElementById('severity-badge');
+  badge.textContent = 'Sévérité : ' + r.severity;
+  badge.style.background = color + '22';
+  badge.style.color = color;
+  badge.style.border = '1px solid ' + color;
+  document.getElementById('treatment-text').textContent = r.treatment;
+
+  // Model details
+  document.getElementById('dl-class').textContent = (r.details.dl_prediction || '—').replace('_',' ');
+  document.getElementById('dl-conf').textContent   = r.details.dl_confidence ? (r.details.dl_confidence*100).toFixed(1)+'%' : '—';
+  document.getElementById('ml-class').textContent  = (r.details.ml_prediction || '—').replace('_',' ');
+  document.getElementById('ml-conf').textContent   = r.details.ml_confidence ? (r.details.ml_confidence*100).toFixed(1)+'%' : '—';
+}
+</script>
+</body>
+</html>
